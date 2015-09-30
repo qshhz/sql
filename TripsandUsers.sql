@@ -41,10 +41,21 @@ VALUES
 (10,4, 13, 12, 'cancelled_by_driver', '2013-10-03');
 
 
-
-SELECT * FROM  Users INNER JOIN Trips ON User_Id = Client_Id
+SELECT COUNT(Status), Request_at FROM  Users INNER JOIN Trips ON User_Id = Client_Id
 WHERE Banned = 'No' AND Role = 'Client' AND Request_at BETWEEN '2013-10-01' AND '2013-10-03'
+GROUP BY Status HAVING Status='cancelled_by_client'
 ORDER BY Request_at;
+
+CREATE TEMPORARY TABLE IF NOT EXISTS tmptab AS (
+SELECT Status, Request_at FROM  Users INNER JOIN Trips ON User_Id = Client_Id
+WHERE Banned = 'No' AND Role = 'Client' AND Request_at BETWEEN '2013-10-01' AND '2013-10-03'
+ORDER BY Request_at);
+
+
+CREATE TEMPORARY TABLE IF NOT EXISTS tmptab1 AS(SELECT COUNT(Status) , Request_at FROM  tmptab GROUP BY Request_at);
+
+CREATE TEMPORARY TABLE IF NOT EXISTS tmptab2 AS(SELECT COUNT(Status), Request_at FROM  tmptab WHERE Status='cancelled_by_client' GROUP BY Request_at);
+
 
 
 
