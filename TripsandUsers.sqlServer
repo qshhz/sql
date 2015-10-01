@@ -1,0 +1,130 @@
+DECLARE @dbname nvarchar(128)
+SET @dbname = N'testdb'
+
+IF (EXISTS (SELECT name FROM master.dbo.sysdatabases 
+    WHERE ('[' + name + ']' = @dbname 
+    OR name = @dbname)))
+    BEGIN
+        -- code mine :)
+            PRINT @dbname + 'db exists'
+                --CREATE DATABASE testdb 
+                END
+                ELSE
+                BEGIN
+                    EXEC ( 'CREATE DATABASE ' + @dbname)
+                        PRINT @dbname + ' created sucessfully!'
+                        END
+
+
+                        USE testdb
+
+                        -- create users table if not exist
+                        IF OBJECT_ID('dbo.Users', 'U') IS NULL
+                        BEGIN
+                            CREATE TABLE Users (
+                                    User_Id INT NOT NULL IDENTITY(1,1),
+                                            Banned varchar(10) NOT NULL CHECK (Banned IN('Yes', 'No')),
+                                                    Role varchar(10) NOT NULL CHECK (Role IN('client', 'driver', 'partner')),
+                                                            PRIMARY KEY (User_Id )
+                                                                );
+                                                                END
+
+
+                                                                -- create users table if not exist
+                                                                BEGIN TRY
+                                                                SET IDENTITY_INSERT Users ON
+                                                                INSERT INTO Users(User_Id, Banned, Role) VALUES(1, 'No', 'client');
+                                                                INSERT INTO Users(User_Id, Banned, Role) VALUES(2, 'Yes', 'client');
+                                                                INSERT INTO Users(User_Id, Banned, Role) VALUES(3, 'No', 'client');
+                                                                INSERT INTO Users(User_Id, Banned, Role) VALUES(4, 'No', 'client');
+                                                                INSERT INTO Users(User_Id, Banned, Role) VALUES(10, 'No', 'driver');
+                                                                INSERT INTO Users(User_Id, Banned, Role) VALUES(11, 'No', 'driver');
+                                                                INSERT INTO Users(User_Id, Banned, Role) VALUES(12, 'No', 'driver');
+                                                                INSERT INTO Users(User_Id, Banned, Role) VALUES(13, 'No', 'driver');
+                                                                SET IDENTITY_INSERT Users OFF
+                                                                END TRY
+                                                                BEGIN CATCH
+                                                                END CATCH
+
+
+
+                                                                --IF  NOT EXISTS (SELECT * FROM sys.objects 
+                                                                --WHERE object_id = OBJECT_ID(N'[dbo].[Trips]') AND type in (N'U'))
+                                                                IF OBJECT_ID('dbo.Trips', 'U') IS NULL
+                                                                BEGIN
+                                                                CREATE TABLE Trips
+                                                                    (
+                                                                            Id           INT NOT NULL IDENTITY PRIMARY KEY,
+                                                                                    Client_Id        INT ,
+                                                                                            Driver_Id    INT,
+                                                                                                    City_Id         INT,
+                                                                                                            Status varchar(20) NOT NULL CHECK (Status IN('completed', 'cancelled_by_driver', 'cancelled_by_client')),
+                                                                                                                    Request_at DATETIME,
+                                                                                                                            FOREIGN KEY (Client_Id ) REFERENCES Users(User_Id )ON UPDATE NO ACTION ON DELETE NO ACTION,
+                                                                                                                                    FOREIGN KEY (Driver_Id ) REFERENCES Users(User_Id )ON UPDATE NO ACTION ON DELETE NO ACTION
+                                                                                                                                        );
+                                                                                                                                        END
+
+
+
+                                                                                                                                        BEGIN TRY
+                                                                                                                                        SET IDENTITY_INSERT Users OFF
+                                                                                                                                        SET IDENTITY_INSERT Trips ON
+                                                                                                                                        INSERT INTO Trips(Id, Client_Id, Driver_Id, City_Id, Status, Request_at)
+                                                                                                                                        VALUES
+                                                                                                                                        (1, 1, 10, 1, 'completed', '2013-10-01'),
+                                                                                                                                        (2, 2, 11, 1, 'cancelled_by_driver', '2013-10-01'),
+                                                                                                                                        (3, 3, 12, 6, 'completed', '2013-10-01'),
+                                                                                                                                        (4, 4, 13, 6, 'cancelled_by_client', '2013-10-01'),
+                                                                                                                                        (5, 1, 10, 1, 'completed', '2013-10-02'),
+                                                                                                                                        (6, 2, 11, 6, 'completed', '2013-10-02'),
+                                                                                                                                        (7, 3, 12, 6, 'completed', '2013-10-02'),
+                                                                                                                                        (8, 2, 12, 12, 'cancelled_by_client', '2013-10-03'),
+                                                                                                                                        (9, 3, 10, 12, 'cancelled_by_client', '2013-10-03'),
+                                                                                                                                        (10,4, 13, 12, 'cancelled_by_driver', '2013-10-03');
+                                                                                                                                        SET IDENTITY_INSERT Trips OFF
+                                                                                                                                        END TRY
+                                                                                                                                        BEGIN CATCH
+                                                                                                                                        END CATCH
+
+
+
+
+
+                                                                                                                                        IF (OBJECT_ID('sp_cancellation_rate_bydates') IS NOT NULL)
+                                                                                                                                        BEGIN
+                                                                                                                                          DROP PROCEDURE sp_cancellation_rate_bydates
+                                                                                                                                          END
+                                                                                                                                          GO
+
+                                                                                                                                          CREATE PROCEDURE sp_cancellation_rate_bydates
+                                                                                                                                              @StartDate DATETIME, 
+                                                                                                                                                  @EndDate DATETIME 
+                                                                                                                                                  AS
+                                                                                                                                                  BEGIN
+
+                                                                                                                                                    SET NOCOUNT ON
+                                                                                                                                                        
+                                                                                                                                                            IF OBJECT_ID('tempdb.dbo.#tmptbl', 'U') IS NOT NULL
+                                                                                                                                                                BEGIN
+                                                                                                                                                                    DROP TABLE #tmptbl 
+                                                                                                                                                                        END
+
+                                                                                                                                                                            SELECT * INTO #tmptbl 
+                                                                                                                                                                                FROM
+                                                                                                                                                                                    (SELECT Status, Request_at FROM  Users INNER JOIN Trips ON User_Id = Client_Id
+                                                                                                                                                                                        WHERE Banned = 'No' AND Role = 'Client' AND Request_at BETWEEN @StartDate AND @EndDate
+                                                                                                                                                                                            ) AS T
+
+                                                                                                                                                                                                --SELECT * FROM　#tmptbl
+                                                                                                                                                                                                    SELECT CAST(T2.count_num *1.0/T1.count_num AS DECIMAL (9,2)) AS 'Cancellation rate', T1.Request_at FROM 
+                                                                                                                                                                                                        (SELECT COUNT(Status) AS count_num, Request_at FROM  #tmptbl GROUP BY Request_at) AS T1 INNER JOIN
+                                                                                                                                                                                                            (SELECT COUNT(Status) AS count_num, Request_at FROM  #tmptbl WHERE Status='cancelled_by_client' GROUP BY Request_at) AS T2 ON T1.Request_at = T2.Request_at
+
+                                                                                                                                                                                                            END
+
+
+                                                                                                                                                                                                            select * from Users
+                                                                                                                                                                                                            EXEC sp_cancellation_rate_bydates @StartDate='2013-10-01', @EndDate='2013-10-03';
+
+
